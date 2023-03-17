@@ -19,6 +19,7 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private bool willSlideOnSlope = true;
     [SerializeField] private bool canZoom = true;
     [SerializeField] private bool canInteract = true;
+    [SerializeField] private bool hasFootsteps = true:
 
 
     [Header("Controls")]
@@ -26,6 +27,7 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private KeyCode jumpKey = KeyCode.Space;
     [SerializeField] private KeyCode crouchKey = KeyCode.LeftControl;
     [SerializeField] private KeyCode zoomKey = KeyCode.Mouse1;
+    [SerializeField] private KeyCode interactKey = KeyCode.Mouse0;
 
 
     [Header("Movement Controller")]
@@ -72,6 +74,19 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private float zoomFOV = 30.0f;
     private float defaultFOV;
     private Coroutine zoomRoutine;
+
+    [Header("Foot step parameter")]
+    [SerializeField] private float baseStepSpeed = 0.3f;
+    [SerializeField] private float crouchStepmultiplier = 0.05f;
+    [SerializeField] private float sprintStepmultiplier = 0.2f;
+    [SerializeField] private AudioSource footStepAudio = default;//to avoid error in the begining when debugging
+    [SerializeField] private AudioClip[] woodClips = default;
+    [SerializeField] private AudioClip[] metalClips = default;
+    [SerializeField] private AudioClip[] grassClips = default;
+    [SerializeField] private AudioClip[] concreteClips = default;
+
+    private float footstepTimer = 0;
+    private float GetCurrentOffset => isCrouching ? baseStepSpeed * crouchStepmultiplier : IsSprinting ? baseStepSpeed * sprintStepmultiplier : baseStepSpeed;
 
     //Sliding Parameter
 
@@ -128,13 +143,6 @@ public class FirstPersonController : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
     // Update is called once per frame
     void Update()
     {
@@ -151,8 +159,10 @@ public class FirstPersonController : MonoBehaviour
             if (canZoom)
                 HandleZoom();
             if (canInteract)
+            {
                 HandleInteractionCheck();
-
+                HandleInteractionInput();
+            }
             ApplyFinalMovement();
         }
     }
@@ -211,11 +221,27 @@ public class FirstPersonController : MonoBehaviour
 
     private void HandleInteractionCheck()
     {
-        
+        if (Physics.Raycast(playerCamera.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance))
+        {
+            if (hit.collider.gameObject.layer == 9 && (currentInteractables == null || hit.collider.gameObject.GetInstanceID() != currentInteractables.GetInstanceID()))
+            {
+                hit.collider.TryGetComponent<Interactables>(out currentInteractables);
+                if (currentInteractables)
+                    currentInteractables.OnFocus();
+            }
+        }
+        else if (currentInteractables)
+        {
+            currentInteractables.OnLoseFocus();
+            currentInteractables = null;
+        }
     }
-    private void HnadleInteractionInput()
+    private void HandleInteractionInput()
     {
-        
+        if (Input.GetKeyDown(interactKey) && currentInteractables != null && Physics.Raycast(playerCamera.ViewportPointToRay(interactionRayPoint), out RaycastHit hit, interactionDistance, interactionLayer))
+        {
+            currentInteractables.OnInteract();
+        }
     }
     private void ApplyFinalMovement()
     {
