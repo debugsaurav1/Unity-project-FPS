@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Xml.Serialization;
 using UnityEngine;
+
 //Completed till tutorial 5
 public class FirstPersonController : MonoBehaviour
 {
@@ -19,7 +20,8 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private bool willSlideOnSlope = true;
     [SerializeField] private bool canZoom = true;
     [SerializeField] private bool canInteract = true;
-    [SerializeField] private bool hasFootsteps = true:
+    [SerializeField]
+    private bool hasFootsteps = true;
 
 
     [Header("Controls")]
@@ -28,6 +30,18 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private KeyCode crouchKey = KeyCode.LeftControl;
     [SerializeField] private KeyCode zoomKey = KeyCode.Mouse1;
     [SerializeField] private KeyCode interactKey = KeyCode.Mouse0;
+
+    [Header("Health parameters")]
+    [SerializeField] private float maxHealth = 100;
+    [SerializeField] private float timeBeforeHealthRegen = 3;
+    [SerializeField] private float healthValueIncrement = 1;
+    [SerializeField] private float healthTimeIncrement = 0.1f;
+    private float currentHealth;
+    private Coroutine regeneratingHealth;
+    public static Action<float> OnTakeDamage;
+    public static Action<float> OnDamage;
+    public static Action<float> OnHeal;
+
 
 
     [Header("Movement Controller")]
@@ -91,9 +105,9 @@ public class FirstPersonController : MonoBehaviour
     //Sliding Parameter
 
     private Vector3 hitPointNormal;
-    private bool IsSliding 
-    { 
-        get 
+    private bool IsSliding
+    {
+        get
         {
             if (Vector3.Angle(hitPointNormal, Vector3.up) > characterController.slopeLimit)
 
@@ -111,9 +125,9 @@ public class FirstPersonController : MonoBehaviour
                 return Vector3.Angle(hitPointNormal, Vector3.up) > characterController.slopeLimit;
 
             }
-            else 
+            else
             {
-                return false;   
+                return false;
             }
         }
     }
@@ -134,10 +148,24 @@ public class FirstPersonController : MonoBehaviour
 
     private float rotationX = 0;
 
-    void Awake() 
+    public static FirstPersonController instance;
+
+    private void OnEnable()
     {
+        OnTakeDamage += ApplyDamage;
+    }
+
+    private void OnDisable()
+    {
+        OnTakeDamage -= ApplyDamage;
+    }
+
+    void Awake()
+    {
+        currentHealth = maxHealth;
+        instance = this;
         playerCamera = GetComponentInChildren<Camera>();
-        characterController = GetComponent < CharacterController>();
+        characterController = GetComponent<CharacterController>();
         defaultYPos = playerCamera.transform.localPosition.y;
         defaultFOV = playerCamera.fieldOfView;
         Cursor.lockState = CursorLockMode.Locked;
@@ -158,6 +186,10 @@ public class FirstPersonController : MonoBehaviour
                 HandleHeadBob();
             if (canZoom)
                 HandleZoom();
+
+            if (hasFootsteps)
+                HandFootsteps();
+
             if (canInteract)
             {
                 HandleInteractionCheck();
@@ -167,35 +199,90 @@ public class FirstPersonController : MonoBehaviour
         }
     }
 
+    private void HandFootsteps()
+    {
+        if (!characterController.isGrounded) return;
+        if (currentInput == Vector2.zero) return;
+        footstepTimer -= Time.deltaTime;
+
+        if (footstepTimer <= 0)
+        {
+            if (Physics.Raycast(playerCamera.transform.position, Vector3.down, out RaycastHit hit, 3))
+            {
+                switch (hit.collider.tag)
+                {
+                    case "footstep/grass":
+                        footStepAudio.PlayOneShot(grassClips[UnityEngine.Random.Range(0, grassClips.Length-1)]);
+                        break;
+
+                    case "footstep/metal":
+                        footStepAudio.PlayOneShot(metalClips[UnityEngine.Random.Range(0, metalClips.Length - 1)]);
+                        break;
+
+                    case "footstep/wood":
+                        footStepAudio.PlayOneShot(woodClips[UnityEngine.Random.Range(0, woodClips.Length - 1)]);
+                        break;
+                    default:
+                        footStepAudio.PlayOneShot(woodClips[UnityEngine.Random.Range(0, woodClips.Length - 1)]);
+                        break;
+
+
+                }
+            }
+            footstepTimer = GetCurrentOffset;
+        }
+    }
+    private void ApplyDamage(float damage) 
+    {
+        currentHealth -= damage;
+
+        OnDamage?.Invoke(currentHealth);
+
+        if (currentHealth <= 0)
+            KillPlayer();
+        else if (regeneratingHealth != null)
+            StopCoroutine(regeneratingHealth);
+
+        regeneratingHealth= StartCoroutine(RegenerateHealth());
+    }
+
+    private void KillPlayer()
+    {
+        currentHealth = 0;
+        if (regeneratingHealth != null)
+            StopCoroutine(RegenerateHealth());
+
+        print("Dead");
+    }
     private void HandleHeadBob()
     {
         if (!characterController.isGrounded) return;
-        if(Mathf.Abs(moveDirection.x)>0.1f || Mathf.Abs(moveDirection.z)>0.1f)
+        if (Mathf.Abs(moveDirection.x) > 0.1f || Mathf.Abs(moveDirection.z) > 0.1f)
         {
-            timer +=Time.deltaTime * (isCrouching? crouchBobSpeed :IsSprinting? sprintBobSpeed:walkBobSpeed);
+            timer += Time.deltaTime * (isCrouching ? crouchBobSpeed : IsSprinting ? sprintBobSpeed : walkBobSpeed);
             playerCamera.transform.localPosition = new Vector3(playerCamera.transform.localPosition.x,
-                defaultYPos + Mathf.Sin(timer)* (isCrouching ? crouchBobAmount : IsSprinting ? sprintBobAmount : walkBobAmount),
+                defaultYPos + Mathf.Sin(timer) * (isCrouching ? crouchBobAmount : IsSprinting ? sprintBobAmount : walkBobAmount),
                 playerCamera.transform.localPosition.z);
         }
     }
 
-    private void HandleKeyboardInput() 
+    private void HandleKeyboardInput()
     {
-        currentInput = new Vector2((isCrouching ?  crouchSpeed : IsSprinting ? sprintSpeed : walkSpeed) * Input.GetAxis("Vertical"), (isCrouching ? crouchSpeed : IsSprinting ? sprintSpeed : walkSpeed) * Input.GetAxis("Horizontal"));
+        currentInput = new Vector2((isCrouching ? crouchSpeed : IsSprinting ? sprintSpeed : walkSpeed) * Input.GetAxis("Vertical"), (isCrouching ? crouchSpeed : IsSprinting ? sprintSpeed : walkSpeed) * Input.GetAxis("Horizontal"));
         float moveDirectionY = moveDirection.y;
 
-        moveDirection = (transform.TransformDirection(Vector3.forward) * currentInput.x)+ (transform.TransformDirection(Vector3.right)*currentInput.y);
+        moveDirection = (transform.TransformDirection(Vector3.forward) * currentInput.x) + (transform.TransformDirection(Vector3.right) * currentInput.y);
         moveDirection.y = moveDirectionY;
     }
-    private void HandleMouseInput() 
+    private void HandleMouseInput()
     {
         rotationX -= Input.GetAxis("Mouse Y") * lookSpeedY;
         rotationX = Mathf.Clamp(rotationX, -upperLookLimit, lowerLookLimit);
         playerCamera.transform.localRotation = Quaternion.Euler(rotationX, 0, 0);
-        transform.rotation *= Quaternion.Euler(0, Input.GetAxis("Mouse X") * lookSpeedX,0);
+        transform.rotation *= Quaternion.Euler(0, Input.GetAxis("Mouse X") * lookSpeedX, 0);
     }
 
-    private void HandleZoom() 
+    private void HandleZoom()
     {
         if (Input.GetKeyDown(zoomKey))
         {
@@ -207,7 +294,7 @@ public class FirstPersonController : MonoBehaviour
 
             zoomRoutine = StartCoroutine(ToggleZoom(true));
         }
-        if (Input.GetKeyUp(zoomKey)) 
+        if (Input.GetKeyUp(zoomKey))
         {
             if (zoomRoutine != null)
             {
@@ -254,7 +341,7 @@ public class FirstPersonController : MonoBehaviour
         characterController.Move(moveDirection * Time.deltaTime);
     }
 
-    private void HandleJump() 
+    private void HandleJump()
     {
         if (ShouldJump)
             moveDirection.y = jumpForce;
@@ -264,22 +351,22 @@ public class FirstPersonController : MonoBehaviour
         if (ShouldCrouch)
             StartCoroutine(CrouchStand());
     }
-    private IEnumerator CrouchStand() 
+    private IEnumerator CrouchStand()
     {
-        if(isCrouching && Physics.Raycast(playerCamera.transform.position, Vector3.up, 20f))
+        if (isCrouching && Physics.Raycast(playerCamera.transform.position, Vector3.up, 20f))
             yield break;
         duringCrouchingAnimation = true;
 
         float timeElapsed = 0;
-        float targetHeight = isCrouching ? standingHeight: crouchHeight;
+        float targetHeight = isCrouching ? standingHeight : crouchHeight;
         float currentHeight = characterController.height;
         Vector3 targetCenter = isCrouching ? standingCenter : crouchCenter;
         Vector3 currentCenter = characterController.center;
 
-        while (timeElapsed < timeToCrouch) 
+        while (timeElapsed < timeToCrouch)
         {
-            characterController.height = Mathf.Lerp(currentHeight,targetHeight, timeElapsed/timeToCrouch);
-            characterController.center = Vector3.Lerp(currentCenter,targetCenter,timeElapsed/timeToCrouch);
+            characterController.height = Mathf.Lerp(currentHeight, targetHeight, timeElapsed / timeToCrouch);
+            characterController.center = Vector3.Lerp(currentCenter, targetCenter, timeElapsed / timeToCrouch);
             timeElapsed += Time.deltaTime;
             yield return null;
         }
@@ -299,13 +386,30 @@ public class FirstPersonController : MonoBehaviour
 
         while (timeElapsed < timeToZoom)
         {
-            playerCamera.fieldOfView = Mathf.Lerp(startingFOV, targetFOV, timeElapsed/timeToZoom);
+            playerCamera.fieldOfView = Mathf.Lerp(startingFOV, targetFOV, timeElapsed / timeToZoom);
             timeElapsed += Time.deltaTime;
             yield return null;
         }
 
         playerCamera.fieldOfView = targetFOV;
         zoomRoutine = null;
+    }
+    private IEnumerator RegenerateHealth()
+    {
+        yield return new WaitForSeconds(timeBeforeHealthRegen);
+        WaitForSeconds timeToWait = new WaitForSeconds(healthTimeIncrement);
+
+        while (currentHealth < maxHealth)
+        {
+            currentHealth += healthTimeIncrement;
+
+            if(currentHealth > maxHealth)
+                currentHealth = maxHealth;
+
+            OnHeal?.Invoke(currentHealth);
+            yield return timeToWait;
+        }
+        regeneratingHealth = null;
     }
 
 
