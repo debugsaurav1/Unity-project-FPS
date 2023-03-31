@@ -1,10 +1,7 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Xml.Serialization;
 using UnityEngine;
 
-//Completed till tutorial 5
 public class FirstPersonController : MonoBehaviour
 {
     public bool CanMove { get; private set; } = true;
