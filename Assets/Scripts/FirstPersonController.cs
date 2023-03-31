@@ -31,7 +31,7 @@ public class FirstPersonController : MonoBehaviour
     [Header("Health parameters")]
     [SerializeField] private float maxHealth = 100;
     [SerializeField] private float timeBeforeHealthRegen = 3;
-    [SerializeField] private float healthValueIncrement = 1;
+  // [SerializeField] private float healthValueIncrement = 1;
     [SerializeField] private float healthTimeIncrement = 0.1f;
     private float currentHealth;
     private Coroutine regeneratingHealth;
@@ -94,7 +94,7 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private AudioClip[] woodClips = default;
     [SerializeField] private AudioClip[] metalClips = default;
     [SerializeField] private AudioClip[] grassClips = default;
-    [SerializeField] private AudioClip[] concreteClips = default;
+    //[SerializeField] private AudioClip[] concreteClips = default;
 
     private float footstepTimer = 0;
     private float GetCurrentOffset => isCrouching ? baseStepSpeed * crouchStepmultiplier : IsSprinting ? baseStepSpeed * sprintStepmultiplier : baseStepSpeed;

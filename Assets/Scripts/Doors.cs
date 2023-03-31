@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class Doors : Interactables
 {
-    private bool isOpen =false;
+    private bool isOpen = false;
     private bool canBeInteractedWith = true;
     private Animator doorAnimator;
 
@@ -14,7 +14,7 @@ public class Doors : Interactables
     }
     public override void OnFocus()
     {
-        throw new System.NotImplementedException();
+        return;
     }
 
     public override void OnInteract()
@@ -22,7 +22,7 @@ public class Doors : Interactables
         if (canBeInteractedWith)
         {
             isOpen = !isOpen;
-            Vector3 doorTransformDirection = transform.TransformDirection(Vector3.forward);
+            Vector3 doorTransformDirection = transform.TransformDirection(Vector3.right);
             Vector3 playerTransformDirection = FirstPersonController.instance.transform.position - transform.position;
             float dotproduct = Vector3.Dot(doorTransformDirection, playerTransformDirection);
 
@@ -33,6 +33,6 @@ public class Doors : Interactables
 
     public override void OnLoseFocus()
     {
-        throw new System.NotImplementedException();
+        return;
     }
 }
